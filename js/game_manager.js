@@ -10,6 +10,10 @@ function GameManager(size, InputManager, Actuator, ScoreManager) {
   this.inputManager.on("restart", this.restart.bind(this));
   this.inputManager.on("keepPlaying", this.keepPlaying.bind(this));
 
+  this.inputManager.on("exchangeAction", this.exchangeAction.bind(this));
+  this.inputManager.on("selectExchangeTile", this.selectExchangeTile.bind(this));
+  
+
   this.setup();
 }
 
@@ -41,6 +45,10 @@ GameManager.prototype.setup = function () {
   this.over        = false;
   this.won         = false;
   this.keepPlaying = false;
+
+  this.exchange    = 1;
+  this.exchangeOn  = false;
+  this.exchangeTiles = [null, null];
 
   // Add the initial tiles
   this.addStartTiles();
@@ -74,6 +82,7 @@ GameManager.prototype.actuate = function () {
 
   this.actuator.actuate(this.grid, {
     score:      this.score,
+    exchange:   this.exchange,
     over:       this.over,
     won:        this.won,
     bestScore:  this.scoreManager.get(),
@@ -105,6 +114,7 @@ GameManager.prototype.move = function (direction) {
   var self = this;
 
   if (this.isGameTerminated()) return; // Don't do anything if the game's over
+  if (this.exchangeOn) return; //When in exchange mode, do not move
 
   var cell, tile;
 
@@ -137,7 +147,13 @@ GameManager.prototype.move = function (direction) {
           tile.updatePosition(positions.next);
 
           // Update the score
+          var scoreOld = self.score;
           self.score += merged.value;
+
+          // When got next point level, won Exchange
+          if (merged.value > 0 && self.score > 0) {
+            self.exchange += (Math.floor(self.score/2000) - Math.floor(scoreOld/2000));
+          }
 
           // The mighty 2048 tile
           if (merged.value === 2048) self.won = true;
@@ -155,7 +171,7 @@ GameManager.prototype.move = function (direction) {
   if (moved) {
     this.addRandomTile();
 
-    if (!this.movesAvailable()) {
+    if (!this.movesAvailable() && this.exchange < 1) {
       this.over = true; // Game over!
     }
 
@@ -243,3 +259,68 @@ GameManager.prototype.tileMatchesAvailable = function () {
 GameManager.prototype.positionsEqual = function (first, second) {
   return first.x === second.x && first.y === second.y;
 };
+
+
+//exchange events
+GameManager.prototype.exchangeAction = function() {
+  this.exchangeTiles = [null, null];
+
+  if (this.exchangeOn) {
+    //cancel exchange mode
+    this.inputManager.cancelExchangeEventRegister();
+    this.actuator.cancelExchange();
+  } else {
+    if (this.exchange > 0) {
+      //enter exchange mode
+      this.inputManager.startExchangeEventRegister();
+      this.actuator.startExchange();
+    } else {
+      this.exchangeOn = false;
+      return;
+    }
+  }
+
+  this.exchangeOn = !this.exchangeOn;
+}
+
+GameManager.prototype.selectExchangeTile = function(tileDiv) {
+  var tile = this.actuator.getTileByWrapper(this.grid, tileDiv);
+
+  if (this.exchangeTiles[0] != null) { //selected 1
+    if (this.exchangeTiles[0] === tile) { //cancel 1 //eq op
+      this.exchangeTiles[0] = null;
+      this.actuator.removeClassFromWrapper(tileDiv, 'tile-exchange');
+    } else { //selected 2
+      this.exchangeTiles[1] = tile;
+      this.actuator.addClassToWrapper(tileDiv, 'tile-exchange');
+      //REPLACE TWO tiles(data)
+      if (!!this.exchangeTiles[0] && !!this.exchangeTiles[1]) {
+        this.grid.cells[this.exchangeTiles[0].x][this.exchangeTiles[0].y] = this.exchangeTiles[1];
+        this.grid.cells[this.exchangeTiles[1].x][this.exchangeTiles[1].y] = this.exchangeTiles[0];
+        var newPos = {x: this.exchangeTiles[1].x, y:this.exchangeTiles[1].y};
+
+        //prepare for tansform animation
+        this.grid.eachCell(function(x,y,tile){
+          if (!!tile) {
+            tile.savePosition();
+          }
+        });
+        this.exchangeTiles[1].updatePosition({x:this.exchangeTiles[0].x, y:this.exchangeTiles[0].y});
+        this.exchangeTiles[0].updatePosition(newPos);
+      }
+
+      this.exchangeAction(); //cancel all
+
+      this.exchange -= 1;
+
+      if (this.exchange < 1 && !this.movesAvailable()) {
+        this.over = true;
+      }
+
+      this.actuate();
+    }
+  } else {//selected new one
+    this.exchangeTiles[0] = tile;
+    this.actuator.addClassToWrapper(tileDiv, 'tile-exchange');
+  }
+}

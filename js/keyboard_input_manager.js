@@ -72,6 +72,10 @@ KeyboardInputManager.prototype.listen = function () {
   keepPlaying.addEventListener("click", this.keepPlaying.bind(this));
   keepPlaying.addEventListener("touchend", this.keepPlaying.bind(this));
 
+  //exchange mouse commands events
+  var exchangeButton = document.querySelector(".exchange-container");
+  exchangeButton.addEventListener("click", this.exchangeAction.bind(this));
+
   // Listen to swipe events
   var touchStartClientX, touchStartClientY;
   var gameContainer = document.getElementsByClassName("game-container")[0];
@@ -128,3 +132,32 @@ KeyboardInputManager.prototype.keepPlaying = function (event) {
   event.preventDefault();
   this.emit("keepPlaying");
 };
+
+KeyboardInputManager.prototype.exchangeAction = function(event) {
+  event.preventDefault();
+  this.emit("exchangeAction");
+}
+
+KeyboardInputManager.prototype.exchangeEventHandler = function(wrapper) {
+  this.emit('selectExchangeTile', wrapper);
+}
+
+KeyboardInputManager.prototype.startExchangeEventRegister = function() {
+  var tileWrappers = document.querySelectorAll('.tile');
+  this.exchangeTileEventHandlers = new Array();
+  for (var i=0; i<tileWrappers.length; i++) {
+    this.exchangeTileEventHandlers[i] = {
+      wrapper: tileWrappers[i],
+      handler: this.exchangeEventHandler.bind(this, tileWrappers[i])
+    };
+    var map = this.exchangeTileEventHandlers[i];
+    map.wrapper.addEventListener("click", map.handler);
+  }
+}
+
+KeyboardInputManager.prototype.cancelExchangeEventRegister = function() {
+  for (var i=0; i<this.exchangeTileEventHandlers.length; i++) {
+    var map = this.exchangeTileEventHandlers[i];
+    map.wrapper.removeEventListener("click", map.handler);
+  }
+}

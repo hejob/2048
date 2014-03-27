@@ -2,9 +2,11 @@ function HTMLActuator() {
   this.tileContainer    = document.querySelector(".tile-container");
   this.scoreContainer   = document.querySelector(".score-container");
   this.bestContainer    = document.querySelector(".best-container");
+  this.exchangeContainer= document.querySelector(".exchange-container");
   this.messageContainer = document.querySelector(".game-message");
 
   this.score = 0;
+  this.exchange = 0;
 }
 
 HTMLActuator.prototype.actuate = function (grid, metadata) {
@@ -23,6 +25,7 @@ HTMLActuator.prototype.actuate = function (grid, metadata) {
 
     self.updateScore(metadata.score);
     self.updateBestScore(metadata.bestScore);
+    self.updateExchange(metadata.exchange);
 
     if (metadata.terminated) {
       if (metadata.over) {
@@ -120,6 +123,29 @@ HTMLActuator.prototype.updateScore = function (score) {
   }
 };
 
+HTMLActuator.prototype.updateExchange = function (exchange) {
+  this.clearContainer(this.exchangeContainer);
+
+  var difference = exchange - this.exchange;
+  this.exchange = exchange
+
+  this.exchangeContainer.textContent = this.exchange;
+
+  if (difference > 0) {
+    var addition = document.createElement("div");
+    addition.classList.add("score-addition");
+    addition.textContent = "+" + difference;
+
+    this.exchangeContainer.appendChild(addition);
+  } else if (difference < 0) {
+    var addition = document.createElement("div");
+    addition.classList.add("score-addition");
+    addition.textContent = "-" + (-difference);
+
+    this.exchangeContainer.appendChild(addition);
+  }
+};
+
 HTMLActuator.prototype.updateBestScore = function (bestScore) {
   this.bestContainer.textContent = bestScore;
 };
@@ -137,3 +163,84 @@ HTMLActuator.prototype.clearMessage = function () {
   this.messageContainer.classList.remove("game-won");
   this.messageContainer.classList.remove("game-over");
 };
+
+HTMLActuator.prototype.startExchange = function () {
+  this.addClassToWrapper(this.exchangeContainer, "exchange-mode");
+}
+
+HTMLActuator.prototype.cancelExchange = function () {
+  this.removeClassFromWrapper(this.exchangeContainer, "exchange-mode");
+  this.removeClass(".tile", 'tile-exchange');
+}
+
+HTMLActuator.prototype.getClasses = function(element) {
+  var classtext = element.getAttribute("class");
+  if (classtext.trim().length == 0) {
+    return [];
+  }
+  return classtext.trim().split(/\s+/);
+}
+
+HTMLActuator.prototype.addClassToWrapper = function(wrapper, classWord) {
+//this: wrapper div;  classWord: single word
+/////classWord should have been trimmed
+  var classes = this.getClasses(wrapper);
+  //add if not in array
+  var classLabel = "";
+  var included = false;
+  for (var i=0; i<classes.length; i++) {
+    if (classWord === classes[i]) {
+      included = true;
+    }
+    classLabel += " " + classes[i];
+  }
+  if (!included) {
+    classLabel += " " + classWord;
+  }
+  //this.applyClasses(wrapper, classes);
+  wrapper.setAttribute("class", classLabel);
+}
+
+HTMLActuator.prototype.removeClassFromWrapper = function(wrapper, classWord) {
+//this: wrapper div;  classWord: single word
+/////classWord should have been trimmed
+  var classes = this.getClasses(wrapper);
+  //add if not in array
+  var classLabel = "";
+  for (var i=0; i<classes.length; i++) {
+    if (classWord !== classes[i]) {
+      classLabel += " " + classes[i];
+    }
+  }
+  //this.applyClasses(wrapper, classes);
+  wrapper.setAttribute("class", classLabel);
+}
+
+HTMLActuator.prototype.addClass = function(selector, classWord) {
+  var wrappers = document.querySelectorAll(selector);
+  for(var i=0; i<wrappers.length; i++) {
+    this.addClassToWrapper(wrappers[i], classWord);
+  }
+}
+
+HTMLActuator.prototype.removeClass = function(selector, classWord) {
+  var wrappers = document.querySelectorAll(selector);
+  for(var i=0; i<wrappers.length; i++) {
+    this.removeClassFromWrapper(wrappers[i], classWord);
+  }
+}
+
+HTMLActuator.prototype.getTileByWrapper = function(grid, wrapper) {
+  //give the selected tile wrapper, get tile object by it's class (xy position)
+  var classText = wrapper.getAttribute("class");
+  if (!classText) {
+    return false;
+  }
+  var matches = classText.match(/\btile-position-(\d)-(\d)\b/);
+  if (matches && matches.length>0) {
+    var x = parseInt(matches[1])-1;
+    var y = parseInt(matches[2])-1;
+    return grid.cells[x][y];
+  }
+  return false;
+}
